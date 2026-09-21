@@ -100,17 +100,19 @@ footer{margin-top:28px;color:var(--muted);font-size:12px;line-height:1.5;border-
   <div class="fields">
     <div class="field"><label for="ppm">Dose (ppm)</label><input id="ppm" type="number" inputmode="decimal" value="20"></div>
     <div class="field"><label for="noconc">Cylinder (ppm)</label><input id="noconc" type="number" inputmode="numeric" value="800"></div>
-    <div class="field full"><label>How do you get the ventilator flow?</label><div class="seg" id="flowmode"><button aria-pressed="true" data-v="direct">Volume mode / HFOV bias flow</button><button aria-pressed="false" data-v="calc">Pressure or PRVC</button></div></div>
-    <div class="field" id="f-direct"><label for="mv">Ventilator flow (L/min)</label><input id="mv" type="number" inputmode="decimal" value="20"></div>
-    <div class="field" id="f-vt" hidden><label for="ivt">VT (mL)</label><input id="ivt" type="number" inputmode="numeric" value="120"></div>
+    <div class="field full"><label>Patient</label><div class="seg" id="ptype"><button aria-pressed="false" data-v="neo">Neonate</button><button aria-pressed="true" data-v="ped">Pediatric</button><button aria-pressed="false" data-v="adult">Adult</button></div></div>
+    <div class="field full"><label>Ventilation</label><div class="seg" id="vmode"><button aria-pressed="true" data-v="conv">Conventional</button><button aria-pressed="false" data-v="hfo">High frequency</button></div></div>
+    <div class="field" id="f-direct"><label for="mv" id="mvlab">Ventilator flow (L/min)</label><input id="mv" type="number" inputmode="decimal" value="20"></div>
+    <div class="field" id="f-vt" hidden><label for="ivt">Exhaled VT (mL)</label><input id="ivt" type="number" inputmode="numeric" value="120"></div>
     <div class="field" id="f-ti" hidden><label for="iti">Ti (seconds)</label><input id="iti" type="number" inputmode="decimal" value="0.6"></div>
+    <div class="field full" id="f-rule" style="background:transparent;padding:4px 2px"><label id="rulelab" style="font-size:14px;color:var(--gold)"></label></div>
   </div>
   <div class="result" style="--c:var(--red);margin-top:14px"><div class="label">Methaemoglobin — what to do</div>
     <div class="big" id="methact" style="font-size:26px;letter-spacing:-.3px">–</div></div>
   <div class="fields">
     <div class="field full"><label for="meth">MetHb (%)</label><input id="meth" type="number" inputmode="decimal" value="1.5"></div>
   </div>
-  <p class="how">NO flow = dose × ventilator flow ÷ cylinder concentration. Ventilator flow: volume modes use the set flow; HFOV uses the bias flow; pressure modes use mean inspiratory flow = VT × 60 ÷ (Ti × 1000). Never stop iNO suddenly; start, test and wean according to your unit protocol.</p>
+  <p class="how">NO flow = dose × ventilator flow ÷ cylinder concentration. Ventilator flow: neonates use the ventilator flow (bias flow on HFO); children use exhaled VT × 60 ÷ (Ti × 1000); adults use exhaled minute ventilation (bias flow 40 on HFO). Never stop iNO suddenly; start, test and wean according to your unit protocol.</p>
 </section>
 
 
@@ -194,7 +196,7 @@ const $=id=>document.getElementById(id), n=id=>parseFloat($(id).value);
 const ok=v=>isFinite(v)&&v>0;
 function seg(id){const g=$(id);g.querySelectorAll('button').forEach(b=>b.onclick=()=>{g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));calc();});}
 const segv=id=>$(id).querySelector('[aria-pressed="true"]').dataset.v;
-['sex','mix','ageu','flowmode'].forEach(seg);
+['sex','mix','ageu','ptype','vmode'].forEach(seg);
 function setBig(id,v,unit,dp=0){$(id).innerHTML=(ok(v)||v===0?v.toFixed(dp):'–')+(unit?`<small>${unit}</small>`:'');}
 function flag(id,cls,text){const f=$(id);f.className='flag '+(text?cls+' show':'');f.textContent=text||'';}
 const PTS=[[50,3.5],[60,6],[70,8.5],[80,11],[90,13],[100,15.5],[110,18.5],[120,22.5],[130,27],[140,33]];
@@ -216,9 +218,17 @@ function calc(){
  $('cylL').textContent=ok(L)?Math.round(L):'–';setBig('cylmin',ok(m)?Math.floor(m):NaN,'min');
  flag('cylflag','red',ok(m)&&m<30?'Less than 30 minutes: take a spare cylinder.':(!ok(m)&&isFinite(m)?'Below the safety reserve: change the cylinder.':''));
  // iNO
- const fm=segv('flowmode');
- $('f-direct').hidden=(fm!=='direct');$('f-vt').hidden=$('f-ti').hidden=(fm!=='calc');
- const vflow=fm==='direct'?n('mv'):n('ivt')*60/(n('iti')*1000);
+ const pt=segv('ptype'),vm=segv('vmode');
+ const mvIn=$('mv');
+ let rule='',vflow;
+ const calcMode=(pt==='ped'&&vm==='conv');
+ $('f-direct').hidden=calcMode;$('f-vt').hidden=$('f-ti').hidden=!calcMode;
+ if(!mvIn.dataset.touched){ if(vm==='hfo') mvIn.value=(pt==='adult'?40:20); else if(pt!=='ped') mvIn.value=(pt==='adult'?8:5); }
+ if(calcMode){vflow=n('ivt')*60/(n('iti')*1000);rule='Flow = exhaled VT × 60 ÷ (Ti × 1000), then flow × dose ÷ 800';}
+ else if(vm==='hfo'){vflow=n('mv');$('mvlab').textContent='Bias flow (L/min)';rule='High frequency: use the bias flow'+(pt==='neo'?' (usually 20)':pt==='adult'?' (usually 40)':'');}
+ else if(pt==='adult'){vflow=n('mv');$('mvlab').textContent='Exhaled minute ventilation MVe (L/min)';rule='Adult conventional: dose × MVe ÷ 800';}
+ else {vflow=n('mv');$('mvlab').textContent='Ventilator flow (L/min)';rule='Neonate conventional: dose × ventilator flow ÷ 800';}
+ $('rulelab').textContent=rule;
  $('usedflow').textContent=ok(vflow)?vflow.toFixed(1):'–';
  const q=n('ppm')*vflow/n('noconc');
  setBig('noflowL',ok(q)?q:NaN,'L/min',2);$('noflow').textContent=ok(q)?Math.round(q*1000):'–';
@@ -259,7 +269,8 @@ function calc(){
   const szn=parseFloat(sz);let fr2=Math.round(szn*2);fr2=fr2%2?fr2+1:fr2;$('ettsu').textContent=fr2;
   $('ettw').textContent=Math.round(w);}
 }
-document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',calc));
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',()=>{e.dataset.touched=1;calc();}));
+document.querySelectorAll('#ptype button,#vmode button').forEach(b=>b.addEventListener('click',()=>{delete $('mv').dataset.touched;calc();}));
 calc();
 </script>
 </body>
