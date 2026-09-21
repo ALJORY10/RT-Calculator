@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RT Calculator</title>
+<style>
+:root{
+  --bg:#0E2233; --panel:#15314A; --line:#25486A; --ink:#EAF2F7; --muted:#9DB4C6;
+  --plum:#7B5CC4; --rose:#E0457B; --teal:#2BB3C0; --gold:#F2B04A; --green:#39C08A; --red:#FF6B5B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:560px;margin:0 auto;padding:18px 16px 40px}
+header h1{font-size:22px;margin:4px 0 2px;letter-spacing:-.2px}
+header p{margin:0;color:var(--muted);font-size:14px}
+nav{display:flex;gap:8px;overflow-x:auto;padding:16px 0 12px;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{flex:0 0 auto;border:1px solid var(--line);background:transparent;color:var(--ink);
+  font-family:inherit;font-size:14px;font-weight:600;line-height:1;padding:10px 14px;border-radius:999px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--c,var(--teal));border-color:var(--c,var(--teal));color:#0E2233}
+nav button:focus-visible,input:focus-visible,select:focus-visible,.seg button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.tool{display:none}
+.tool.on{display:block}
+.result{border-radius:22px;padding:18px 20px 16px;background:var(--panel);border-left:6px solid var(--c,var(--teal));margin-bottom:14px}
+.result .label{color:var(--muted);font-size:14px}
+.big{font-size:64px;font-weight:800;line-height:1.02;letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
+.big small{font-size:22px;font-weight:600;letter-spacing:0;color:var(--muted);margin-left:6px}
+.sub{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-variant-numeric:tabular-nums}
+.sub div{font-size:15px}.sub b{font-size:20px}
+.flag{margin-top:10px;font-size:14px;padding:8px 10px;border-radius:10px;display:none}
+.flag.show{display:block}
+.flag.red{background:rgba(255,107,91,.15);color:#FFB3A9}
+.flag.green{background:rgba(57,192,138,.15);color:#9BE8C6}
+.flag.gold{background:rgba(242,176,74,.15);color:#FFD89A}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{background:var(--panel);border-radius:16px;padding:10px 12px}
+.field.full{grid-column:1/-1}
+.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
+.field input,.field select{width:100%;background:transparent;border:0;color:var(--ink);
+  font-family:inherit;font-size:26px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums;padding:0;appearance:none;-webkit-appearance:none}
+.field select{font-size:20px}
+.field select option{color:#000}
+.seg{display:flex;gap:6px;margin-top:2px}
+.seg button{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);font-family:inherit;font-size:15px;font-weight:600;padding:8px 0;border-radius:10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--c,var(--teal));color:#0E2233;border-color:transparent}
+.how{color:var(--muted);font-size:13px;margin:12px 2px 0;line-height:1.5}
+footer{margin-top:28px;color:var(--muted);font-size:12px;line-height:1.5;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion:no-preference){.big{transition:color .2s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>RT Calculator</h1>
+  <p>Type what you have. Get the number you need.</p>
+</header>
+
+<nav role="tablist" id="tabs"></nav>
+
+<!-- VT -->
+<section class="tool" id="t-vt" style="--c:var(--teal)">
+  <div class="result"><div class="label">Tidal volume at 6 mL/kg PBW</div>
+    <div class="big" id="vt6">–<small>mL</small></div>
+    <div class="sub"><div>4 mL/kg <b id="vt4">–</b></div><div>8 mL/kg <b id="vt8">–</b></div><div>PBW <b id="pbw">–</b> kg</div></div>
+    <div class="flag gold" id="vtflag"></div></div>
+  <div class="fields">
+    <div class="field"><label for="ht">Height (cm)</label><input id="ht" type="number" inputmode="decimal" value="110"></div>
+    <div class="field"><label>Sex (used from 140 cm)</label><div class="seg" id="sex"><button aria-pressed="true" data-v="m">Male</button><button aria-pressed="false" data-v="f">Female</button></div></div>
+  </div>
+  <p class="how">PBW is the median weight for height (growth chart) under 140 cm and the ARDSnet formula from 152 cm, blended in between. PALICC-2 range: 4–8 mL/kg, 3–6 if compliance is poor.</p>
+</section>
+
+<!-- Cylinder -->
+<section class="tool" id="t-cyl" style="--c:var(--rose)">
+  <div class="result"><div class="label">Time left in the cylinder</div>
+    <div class="big" id="cylmin">–<small>min</small></div>
+    <div class="sub"><div>Usable <b id="cylL">–</b> L</div></div>
+    <div class="flag red" id="cylflag"></div></div>
+  <div class="fields">
+    <div class="field"><label for="cyltype">Cylinder</label><select id="cyltype">
+      <option value="0.16">D (0.16 L/psi)</option><option value="0.28" selected>E (0.28 L/psi)</option>
+      <option value="1.56">M (1.56 L/psi)</option><option value="2.41">G (2.41 L/psi)</option><option value="3.14">H/K (3.14 L/psi)</option></select></div>
+    <div class="field"><label for="psi">Pressure (psi)</label><input id="psi" type="number" inputmode="numeric" value="2000"></div>
+    <div class="field"><label for="cflow">Flow (L/min)</label><input id="cflow" type="number" inputmode="decimal" value="6"></div>
+    <div class="field"><label for="reserve">Safety reserve (psi)</label><input id="reserve" type="number" inputmode="numeric" value="200"></div>
+  </div>
+  <p class="how">Minutes = (psi − reserve) × factor ÷ flow. Transport ventilators may use more gas than the set flow; check the device.</p>
+</section>
+
+<!-- iNO -->
+<section class="tool" id="t-ino" style="--c:var(--plum)">
+  <div class="result"><div class="label">iNO flow to deliver the dose</div>
+    <div class="big" id="noflowL">–<small>L/min</small></div>
+    <div class="sub"><div>= <b id="noflow">–</b> mL/min</div><div>Vent flow <b id="usedflow">–</b> L/min</div></div>
+    <div class="flag gold" id="noflag"></div></div>
+  <div class="fields">
+    <div class="field"><label for="ppm">Dose (ppm)</label><input id="ppm" type="number" inputmode="decimal" value="20"></div>
+    <div class="field"><label for="noconc">Cylinder (ppm)</label><input id="noconc" type="number" inputmode="numeric" value="800"></div>
+    <div class="field full"><label>How do you get the ventilator flow?</label><div class="seg" id="flowmode"><button aria-pressed="true" data-v="direct">Volume mode / HFOV bias flow</button><button aria-pressed="false" data-v="calc">Pressure or PRVC</button></div></div>
+    <div class="field" id="f-direct"><label for="mv">Ventilator flow (L/min)</label><input id="mv" type="number" inputmode="decimal" value="20"></div>
+    <div class="field" id="f-vt" hidden><label for="ivt">VT (mL)</label><input id="ivt" type="number" inputmode="numeric" value="120"></div>
+    <div class="field" id="f-ti" hidden><label for="iti">Ti (seconds)</label><input id="iti" type="number" inputmode="decimal" value="0.6"></div>
+  </div>
+  <div class="result" style="--c:var(--red);margin-top:14px"><div class="label">Methaemoglobin — what to do</div>
+    <div class="big" id="methact" style="font-size:26px;letter-spacing:-.3px">–</div></div>
+  <div class="fields">
+    <div class="field full"><label for="meth">MetHb (%)</label><input id="meth" type="number" inputmode="decimal" value="1.5"></div>
+  </div>
+  <p class="how">NO flow = dose × ventilator flow ÷ cylinder concentration. Ventilator flow: volume modes use the set flow; HFOV uses the bias flow; pressure modes use mean inspiratory flow = VT × 60 ÷ (Ti × 1000). Never stop iNO suddenly; start, test and wean according to your unit protocol.</p>
+</section>
+
+
+
+<!-- Heliox -->
+<section class="tool" id="t-hx" style="--c:var(--gold)">
+  <div class="result"><div class="label">Real heliox flow</div>
+    <div class="big" id="hxreal">–<small>L/min</small></div>
+    <div class="sub"><div>Factor <b id="hxf">–</b></div></div></div>
+  <div class="fields">
+    <div class="field"><label>Mix (He:O₂)</label><div class="seg" id="mix"><button aria-pressed="true" data-v="1.8">80:20</button><button aria-pressed="false" data-v="1.6">70:30</button><button aria-pressed="false" data-v="1.4">60:40</button></div></div>
+    <div class="field"><label for="hxread">O₂ flowmeter reads (L/min)</label><input id="hxread" type="number" inputmode="decimal" value="10"></div>
+  </div>
+  <p class="how">An oxygen flowmeter under-reads heliox. Real flow = reading × factor. The benefit fades when the child needs FiO₂ above about 0.40.</p>
+</section>
+
+<!-- Gas to vent -->
+<section class="tool" id="t-gas" style="--c:var(--teal)">
+  <div class="result"><div class="label">New rate for the target PaCO₂</div>
+    <div class="big" id="newrr">–<small>/min</small></div>
+    <div class="sub"><div>or keep RR, new VT <b id="newvt">–</b> mL</div></div>
+    <div class="flag red" id="rrflag"></div></div>
+  <div class="fields">
+    <div class="field"><label for="rr">Current RR</label><input id="rr" type="number" inputmode="numeric" value="20"></div>
+    <div class="field"><label for="vt">Current VT (mL)</label><input id="vt" type="number" inputmode="numeric" value="120"></div>
+    <div class="field"><label for="pco2">PaCO₂ now</label><input id="pco2" type="number" inputmode="numeric" value="60"></div>
+    <div class="field"><label for="tco2">Target PaCO₂</label><input id="tco2" type="number" inputmode="numeric" value="45"></div>
+  </div>
+  <div class="result" style="--c:var(--plum);margin-top:14px"><div class="label">New FiO₂ for the target PaO₂</div>
+    <div class="big" id="newfio2">–<small>%</small></div>
+    <div class="flag" id="fioflag"></div></div>
+  <div class="fields">
+    <div class="field"><label for="fio2">Current FiO₂ (%)</label><input id="fio2" type="number" inputmode="numeric" value="60"></div>
+    <div class="field"><label for="po2">PaO₂ now</label><input id="po2" type="number" inputmode="numeric" value="110"></div>
+    <div class="field full"><label for="tpo2">Target PaO₂</label><input id="tpo2" type="number" inputmode="numeric" value="80"></div>
+  </div>
+  <p class="how">Assumes the lung and dead space stay the same. Change one thing, then recheck the gas.</p>
+</section>
+
+<!-- OI -->
+<section class="tool" id="t-oi" style="--c:var(--rose)">
+  <div class="result"><div class="label">Oxygenation index</div>
+    <div class="big" id="oi">–</div>
+    <div class="sub"><div>OSI <b id="osi">–</b></div><div>P/F <b id="pf">–</b></div><div>S/F <b id="sf">–</b></div></div>
+    <div class="flag" id="oiflag"></div></div>
+  <div class="fields">
+    <div class="field"><label for="map">MAP (cmH₂O)</label><input id="map" type="number" inputmode="decimal" value="15"></div>
+    <div class="field"><label for="ofio2">FiO₂ (%)</label><input id="ofio2" type="number" inputmode="numeric" value="60"></div>
+    <div class="field"><label for="opo2">PaO₂</label><input id="opo2" type="number" inputmode="numeric" value="70"></div>
+    <div class="field"><label for="ospo2">SpO₂ (%)</label><input id="ospo2" type="number" inputmode="numeric" value="92"></div>
+  </div>
+  <p class="how">OI = MAP × FiO₂ × 100 ÷ PaO₂ (pre-ductal PaO₂ in the newborn). OSI uses SpO₂ and is only valid when SpO₂ ≤ 97%. Severe PARDS (PALICC-2): OI ≥ 16 or OSI ≥ 12.</p>
+</section>
+
+<!-- ETT -->
+<section class="tool" id="t-ett" style="--c:var(--gold)">
+  <div class="result"><div class="label">Cuffed ETT</div>
+    <div class="big" id="ettsz">–<small>mm</small></div>
+    <div class="sub"><div>Depth <b id="ettd">–</b> cm</div><div>Suction <b id="ettsu">–</b> Fr</div><div>Est. wt <b id="ettw">–</b> kg</div></div>
+    <div class="flag gold show">Have one size smaller and larger ready.</div></div>
+  <div class="fields">
+    <div class="field"><label for="age">Age</label><input id="age" type="number" inputmode="decimal" value="4"></div>
+    <div class="field"><label>Unit</label><div class="seg" id="ageu"><button aria-pressed="false" data-v="m">Months</button><button aria-pressed="true" data-v="y">Years</button></div></div>
+  </div>
+  <p class="how">Cuffed size = age/4 + 3.5 (from 2 years); under 1 year 3.0–3.5; 1–2 years 3.5. Depth = age/2 + 12 from 2 years, ETT × 3 below. Weight by APLS formula.</p>
+</section>
+
+<footer>Decision support for respiratory therapists. Always verify against your unit policy and the physician order.<br>Built by Aljory Alqahtani, RT Intern · v1.0</footer>
+</div>
+
+<script>
+const TOOLS=[["t-oi","OI / OSI","var(--rose)"],["t-ino","iNO","var(--plum)"],["t-vt","VT by height","var(--teal)"],["t-cyl","Cylinder","var(--rose)"],["t-hx","Heliox","var(--gold)"],
+["t-gas","Gas → vent","var(--teal)"],["t-ett","ETT by age","var(--gold)"]];
+const tabs=document.getElementById('tabs');
+TOOLS.forEach(([id,name,c],i)=>{const b=document.createElement('button');b.textContent=name;b.setAttribute('role','tab');
+ b.style.setProperty('--c',c);b.onclick=()=>show(id);b.dataset.id=id;tabs.appendChild(b);});
+function show(id){document.querySelectorAll('.tool').forEach(t=>t.classList.toggle('on',t.id===id));
+ tabs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b.dataset.id===id));}
+show('t-oi');
+const $=id=>document.getElementById(id), n=id=>parseFloat($(id).value);
+const ok=v=>isFinite(v)&&v>0;
+function seg(id){const g=$(id);g.querySelectorAll('button').forEach(b=>b.onclick=()=>{g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));calc();});}
+const segv=id=>$(id).querySelector('[aria-pressed="true"]').dataset.v;
+['sex','mix','ageu','flowmode'].forEach(seg);
+function setBig(id,v,unit,dp=0){$(id).innerHTML=(ok(v)||v===0?v.toFixed(dp):'–')+(unit?`<small>${unit}</small>`:'');}
+function flag(id,cls,text){const f=$(id);f.className='flag '+(text?cls+' show':'');f.textContent=text||'';}
+const PTS=[[50,3.5],[60,6],[70,8.5],[80,11],[90,13],[100,15.5],[110,18.5],[120,22.5],[130,27],[140,33]];
+function ards(h,s){return (s==='m'?50:45.5)+0.91*(h-152.4);}
+function pbw(h,s){
+ if(h<=PTS[0][0])return PTS[0][1]*h/PTS[0][0];
+ for(let i=1;i<PTS.length;i++)if(h<=PTS[i][0]){const[a,wa]=PTS[i-1],[b,wb]=PTS[i];return wa+(wb-wa)*(h-a)/(b-a);}
+ if(h<152.4){const w0=33,w1=ards(152.4,s);return w0+(w1-w0)*(h-140)/12.4;}
+ return ards(h,s);}
+function calc(){
+ // VT
+ const h=n('ht'),s=segv('sex');
+ if(ok(h)){const p=pbw(h,s);$('pbw').textContent=p.toFixed(1);setBig('vt6',Math.round(p*6),'mL');
+  $('vt4').textContent=Math.round(p*4);$('vt8').textContent=Math.round(p*8);
+  flag('vtflag','gold',h<50||h>200?'Height outside the usual range, check the value.':'');}
+ else{setBig('vt6',NaN,'mL');}
+ // cylinder
+ const L=(n('psi')-n('reserve'))*n('cyltype'),m=L/n('cflow');
+ $('cylL').textContent=ok(L)?Math.round(L):'–';setBig('cylmin',ok(m)?Math.floor(m):NaN,'min');
+ flag('cylflag','red',ok(m)&&m<30?'Less than 30 minutes: take a spare cylinder.':(!ok(m)&&isFinite(m)?'Below the safety reserve: change the cylinder.':''));
+ // iNO
+ const fm=segv('flowmode');
+ $('f-direct').hidden=(fm!=='direct');$('f-vt').hidden=$('f-ti').hidden=(fm!=='calc');
+ const vflow=fm==='direct'?n('mv'):n('ivt')*60/(n('iti')*1000);
+ $('usedflow').textContent=ok(vflow)?vflow.toFixed(1):'–';
+ const q=n('ppm')*vflow/n('noconc');
+ setBig('noflowL',ok(q)?q:NaN,'L/min',2);$('noflow').textContent=ok(q)?Math.round(q*1000):'–';
+ flag('noflag','gold','Keep iNO connected during bagging, suction and transport. Check NO₂ and methaemoglobin as your unit protocol requires.');
+ const mh=n('meth');
+ if(ok(mh)){
+  let a='';
+  a=mh>5?'Above 5%: notify the physician and follow your unit protocol':mh>2?'Above normal: monitor closely and report per unit policy':'Within the normal range';
+  $('methact').textContent=a;
+  $('methact').style.color=(mh>5?'var(--red)':mh>2?'var(--gold)':'var(--green)');}
+ else $('methact').textContent='–';
+ // heliox
+ const f=parseFloat(segv('mix'));$('hxf').textContent=f;setBig('hxreal',n('hxread')*f,'L/min',1);
+ // gas
+ const rr=n('rr')*n('pco2')/n('tco2');setBig('newrr',ok(rr)?Math.round(rr):NaN,'/min');
+ const nv=n('vt')*n('pco2')/n('tco2');$('newvt').textContent=ok(nv)?Math.round(nv):'–';
+ flag('rrflag','red',ok(rr)&&rr>40?'High rate: check expiratory time and auto-PEEP, consider a larger VT within the safe range.':'');
+ const fi=n('fio2')*n('tpo2')/n('po2');
+ if(ok(fi)){const v=Math.max(21,fi);setBig('newfio2',Math.min(100,v),'%');
+  if(fi>100)flag('fioflag','red','Oxygen alone will not reach the target: raise PEEP or MAP.');
+  else if(fi<n('fio2'))flag('fioflag','green','You can lower the FiO₂.');else flag('fioflag','','');}
+ else setBig('newfio2',NaN,'%');
+ // OI
+ const fr=n('ofio2')/100,oi=n('map')*fr*100/n('opo2'),osi=n('map')*fr*100/n('ospo2');
+ setBig('oi',oi,'',1);$('osi').textContent=ok(osi)?osi.toFixed(1):'–';
+ $('pf').textContent=ok(n('opo2')/fr)?Math.round(n('opo2')/fr):'–';$('sf').textContent=ok(n('ospo2')/fr)?Math.round(n('ospo2')/fr):'–';
+ const big=$('oi');
+ if(ok(oi)){if(oi>=16){big.style.color='var(--red)';flag('oiflag','red','Severe PARDS range: consider rescue options with the team.');}
+  else if(oi>=8){big.style.color='var(--gold)';flag('oiflag','gold','Moderate range: optimize PEEP and recruitment.');}
+  else{big.style.color='var(--green)';flag('oiflag','green','Mild range.');}}
+ if(n('ospo2')>97)flag('oiflag','gold','SpO₂ above 97%: OSI is not reliable, use OI.');
+ // ETT
+ let a=n('age');const u=segv('ageu');const y=u==='m'?a/12:a;
+ if(ok(y)||y===0){let sz,d,w;
+  if(y<1){sz='3.0–3.5';d=10;w=(y*12)*0.5+4;}else if(y<2){sz='3.5';d=11;w=2*y+8;}
+  else{let v=Math.round((y/4+3.5)*2)/2;sz=v.toFixed(1);d=Math.round(y/2+12);w=y<=5?2*y+8:3*y+7;}
+  $('ettsz').innerHTML=sz+'<small>mm</small>';$('ettd').textContent=d;
+  const szn=parseFloat(sz);let fr2=Math.round(szn*2);fr2=fr2%2?fr2+1:fr2;$('ettsu').textContent=fr2;
+  $('ettw').textContent=Math.round(w);}
+}
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',calc));
+calc();
+</script>
+</body>
+</html>
